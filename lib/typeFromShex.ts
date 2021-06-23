@@ -1,4 +1,5 @@
-import { traverseShex, Schema } from "shexj-traverser";
+import { traverseShex } from "shexj-traverser";
+import 
 import * as dom from "dts-dom";
 
 function nameFromUri(uri: string): string {
@@ -8,168 +9,345 @@ function nameFromUri(uri: string): string {
 
 export default async function typeFromShex(shexSchema: Schema) {
   return traverseShex<
+    // Base Return value generics
     dom.NamespaceDeclaration, // Schema return type
-    undefined, // prefixes return type
-    undefined, // SemAct return type
-    dom.Type | dom.InterfaceDeclaration, // shapeExpr return type
-    dom.InterfaceDeclaration[], // shapes return type
-    string, // ShapesOr return type
-    string, // ShapesAnd return type
-    string, // ShapesNot return type
-    string, // ShapeRef return type
-    dom.Type, // NodeConstraint return type
-    dom.InterfaceDeclaration, // Shape return type
-    string, // valueSetValue return type
-    dom.InterfaceDeclaration | dom.PropertyDeclaration, // tripleExpr return type
-    undefined, // Annotation return type
-    dom.InterfaceDeclaration, // EachOf return type
-    dom.InterfaceDeclaration, // OneOf return type
-    dom.PropertyDeclaration, // TripleConstraint return type
+    string, // ShapeOr return type
+    string, // ShapeAnd return type
+    string, // ShapeNot return type
+    string, // ShapeExternal return type
+    string, // NodeConstraint return type
     string, // ObjectLiteral return type
-    string, // IriStem return type
+    string, // IriStem retrun type
     string, // IriStemRange return type
     string, // LiteralStem return type
     string, // LiteralStemRange return type
     string, // Language return type
     string, // LanguageStem return type
     string, // LanguageStemRange return type
-    { name?: string; comment?: string }, // Annotations return type
-    string // SemActs return type
+    string, // Wildcard return type
+    dom.InterfaceDeclaration, // Shape return type
+    string, // EachOf return type
+    string, // OneOf return type
+    string, // TripleConstraint return type
+    string, // SemAct return type
+    string, // Annotation return type
+    // Return types for constructed types
+    string, // shapeExpr return type
+    string, // valueSetValue return type
+    string, // tripleExpr return type
+    // Return specific field values
+    undefined, // Schema_startActs return type
+    undefined, // Schema_start return type
+    dom.NamespaceMember[], // Schema_shapes return type
+    string, // ShapeOr_shapeExprs return type
+    string, // ShapeAnd_shapeExprs return type
+    string, // ShapeNot_shapeExpr return type
+    string, // NodeConstraint_values return type
+    string, // IriStemRange_exclusions return type
+    string, // LiteralStemRange_exclusions return type
+    string, // LanguageStemRange_exclusions return type
+    string, // Shape_expression return type
+    string, // Shape_semActs return type
+    string, // Shape_Annotations return type
+    string, // EachOf_expressions return type
+    string, // EachOf_semActs return type
+    string, // EachOf_Annotations return type
+    string, // OneOf_expressions return type
+    string, // OneOf_semActs return type
+    string, // OneOf_Annotations return type
+    string, // TripleConstraint_valueExpr return type
+    string, // TripleConstraint_semActs return type
+    string  // TripleConstraint_Annotations return type
   >(shexSchema, {
-    Schema: async (schema, transformmedChildren) => {
-      const namespaceName = schema.base ? nameFromUri(schema.base) : "schema";
-      const namespace = dom.create.namespace(namespaceName);
-      if (transformmedChildren.shapes) {
-        namespace.members.push(...transformmedChildren.shapes);
+    Schema: async (schema, transformedChildren): Promise<dom.NamespaceDeclaration> => {
+      const namespace = dom.create.namespace("placeholder");
+      if (transformedChildren.shapes) {
+        namespace.members.concat(transformedChildren.shapes);
       }
       return namespace;
     },
-    shapeExpr: async (shapeExpr, transformmedChild) => {
-      if (typeof transformmedChild === "string") {
-        throw new Error("Cannot handle strings for shapeExpr");
-      }
-      if (
-        (transformmedChild as dom.InterfaceDeclaration).kind &&
-        (transformmedChild as dom.InterfaceDeclaration).kind === "interface"
-      ) {
-        return transformmedChild as dom.InterfaceDeclaration;
-      }
-      return transformmedChild as dom.Type;
+    ShapeOr: async (
+      shapeOr,
+      transformedChildren,
+      parentStack
+    ): Promise<string> => {
+      return `ShapeOr(${transformedChildren.shapeExprs})`;
     },
-    shapes: async (shapes, transformmedChildren) => {
-      const values = Object.values(transformmedChildren);
-      return values.filter(
-        (value) =>
-          (value as dom.InterfaceDeclaration).kind &&
-          (value as dom.InterfaceDeclaration).kind === "interface"
-      ) as dom.InterfaceDeclaration[];
+    ShapeAnd: async (
+      shapeAnd,
+      transformedChildren,
+      parentStack
+    ): Promise<string> => {
+      return `ShapeAnd(${transformedChildren.shapeExprs})`;
     },
-    Shape: async (shape, transformmed, parentStack) => {
-      let intf: dom.InterfaceDeclaration;
-      let interfaceName: string;
-      const parent = parentStack.find((p) => p.type === "shapes");
-      if (parent && parent.via) {
-        interfaceName = nameFromUri(parent.via);
-      } else if (transformmed.annotations?.name) {
-        interfaceName = transformmed.annotations.name;
-      } else {
-        interfaceName = "UnknownInterfaceName";
-      }
-      if (
-        transformmed.expression &&
-        transformmed.expression.kind === "interface"
-      ) {
-        intf = transformmed.expression;
-      } else if (transformmed.expression) {
-        throw new Error("Cannot handle ");
-      } else {
-        intf = dom.create.interface(interfaceName);
-      }
-      if (transformmed.annotations?.comment) {
-        intf.jsDocComment = transformmed.annotations.comment;
-      }
-      return intf;
+    ShapeNot: async (
+      shapeNot,
+      transformedChildren,
+      parentStack
+    ): Promise<string> => {
+      return `ShapeNot(${transformedChildren.shapeExpr})`;
     },
-    Annotations: async (annotations) => {
-      let comment: string | undefined;
-      let name: string | undefined;
-      annotations.forEach((annotation) => {
-        if (
-          annotation.predicate ===
-          "http://www.w3.org/2000/01/rdf-schema#comment"
-        ) {
-          if (typeof annotation.object === "string") {
-            comment = annotation.object;
-          } else if (
-            annotation.object.value &&
-            annotation.object.value === "string"
-          ) {
-            comment = annotation.object.value;
-          }
-        } else if (
-          annotation.predicate === "http://www.w3.org/2000/01/rdf-schema#label"
-        ) {
-          if (typeof annotation.object === "string") {
-            name = annotation.object;
-          } else if (
-            annotation.object.value &&
-            annotation.object.value === "string"
-          ) {
-            name = annotation.object.value;
-          }
-        }
-      });
-      return { name, comment };
+    ShapeExternal: async (shapeExternal, parentStack): Promise<string> => {
+      return `ShapeExternal`;
     },
-    tripleExpr: async (tripleExpr, transfromedChildren) => {
-      if (typeof transfromedChildren === "string") {
-        throw new Error("String tripleExpr not implemented");
-      }
-      return transfromedChildren;
+    NodeConstraint: async (
+      nodeConstraint,
+      transformedChildren,
+      parentStack
+    ): Promise<string> => {
+      return `NodeConstraint(${transformedChildren.values})`;
     },
-    EachOf: async (eachOf, transformedChildren, parentStack) => {
-      const shapesVia = parentStack.find((p) => p.type === "shapes")?.via;
-      const interfaceName =
-        transformedChildren.annotations?.name || shapesVia
-          ? nameFromUri(shapesVia as string)
-          : "UnknownInterfaceName";
-      const intf = dom.create.interface(interfaceName);
-      if (transformedChildren?.annotations?.comment) {
-        intf.jsDocComment = transformedChildren.annotations.comment;
-      }
-      transformedChildren.expressions?.forEach((child) => {
-        if (child.kind === "interface") {
-          throw new Error("Cannot handle interface in EachOf");
-        } else {
-          intf.members.push(child);
-        }
-      });
-      return intf;
+    ObjectLiteral: async (objectLiteral, parentStack): Promise<string> => {
+      return `ObjectLiteral`;
     },
-    OneOf: async (oneOf, transfromedChildren) => {
-      throw new Error("Not Implemented");
+    IriStem: async (iriStem, parentStack): Promise<string> => {
+      return `IriStem`;
     },
-    TripleConstraint: async (tripleConstraint, transformedChildren) => {
-      const propertyName = nameFromUri(tripleConstraint.predicate);
-      if (!transformedChildren.valueExpr) {
-        throw new Error("Cannot handle ");
-      }
-      const property = dom.create.property(
-        propertyName,
-        transformedChildren.valueExpr
-      );
-      return property;
+    IriStemRange: async (
+      iriStemRange,
+      transformedChildren,
+      parentStack
+    ): Promise<string> => {
+      return `IriStemRange(${transformedChildren.exclusions})`;
     },
-    NodeConstraint: async (nodeConstraint, transformedChildren) => {
-      if (nodeConstraint.datatype) {
-        switch (nodeConstraint.datatype) {
-          case "http://www.w3.org/2001/XMLSchema#string":
-            return dom.type.string;
-          case "http://www.w3.org/2001/XMLSchema#dateTime":
-            return dom.type.string;
-        }
-      }
-      return dom.type.string;
-    }
+    LiteralStem: async (literalStem, parentStack): Promise<string> => {
+      return `LiteralStem`;
+    },
+    LiteralStemRange: async (
+      literalStemRange,
+      transformedChildren,
+      parentStack
+    ): Promise<string> => {
+      return `LiteralStemRange(${transformedChildren.exclusions})`;
+    },
+    Language: async (language, parentStack): Promise<string> => {
+      return `Language`;
+    },
+    LanguageStem: async (languageStem, parentStack): Promise<string> => {
+      return `LanguageStem`;
+    },
+    LanguageStemRange: async (
+      languageStemRange,
+      transformedChildren,
+      parentStack
+    ): Promise<string> => {
+      return `LanguageStemRange(${transformedChildren.exclusions})`;
+    },
+    Wildcard: async (wildcard, parentStack): Promise<string> => {
+      return `Wildcard`;
+    },
+    Shape: async (
+      shape,
+      transformedChildren,
+      parentStack
+    ): Promise<string> => {
+      return `Shape(${transformedChildren.expression},${transformedChildren.semActs},${transformedChildren.annotations})`;
+    },
+    EachOf: async (
+      eachOf,
+      transformedChildren,
+      parentStack
+    ): Promise<string> => {
+      return `EachOf(${transformedChildren.expressions},${transformedChildren.semActs},${transformedChildren.annotations})`;
+    },
+    OneOf: async (
+      eachOf,
+      transformedChildren,
+      parentStack
+    ): Promise<string> => {
+      return `OneOf(${transformedChildren.expressions},${transformedChildren.semActs},${transformedChildren.annotations})`;
+    },
+    TripleConstraint: async (
+      tripleConstraint,
+      transformedChildren,
+      parentStack
+    ): Promise<string> => {
+      return `TripleConstraint(${transformedChildren.valueExpr},${transformedChildren.semActs},${transformedChildren.annotations})`;
+    },
+    SemAct: async (wildcard, parentStack): Promise<string> => {
+      return `SemAct`;
+    },
+    Annotation: async (wildcard, parentStack): Promise<string> => {
+      return `Annotation`;
+    },
+    shapeExpr: async (
+      shapeExpr,
+      transformedSelf,
+      parentStack
+    ): Promise<string> => {
+      return `shapeExpr(${transformedSelf})`;
+    },
+    valueSetValue: async (
+      valueSetValue,
+      transformedSelf,
+      parentStack
+    ): Promise<string> => {
+      return `valueSetValue(${transformedSelf})`;
+    },
+    tripleExpr: async (
+      tripleExpr,
+      transformedSelf,
+      parentStack
+    ): Promise<string> => {
+      return `tripleExpr(${transformedSelf})`;
+    },
+    Schema_startActs: async (
+      semActs,
+      transformed,
+      parentStack
+    ): Promise<undefined> => {
+      return undefined;
+    },
+    Schema_start: async (
+      shapeExpr,
+      transformed,
+      parentStack
+    ): Promise<undefined> => {
+      return undefined;
+    },
+    Schema_shapes: async (
+      shapes,
+      transformed,
+      parentStack
+    ): Promise<dom.NamespaceMember> => {
+      return `Schema_shapes(${transformed})`;
+    },
+    ShapeOr_shapeExprs: async (
+      shapeExprs,
+      transformed,
+      parentStack
+    ): Promise<string> => {
+      return `ShapeOr_shapeExprs(${transformed})`;
+    },
+    ShapeAnd_shapeExprs: async (
+      shapeExprs,
+      transformed,
+      parentStack
+    ): Promise<string> => {
+      return `ShapeAnd_shapeExprs(${transformed})`;
+    },
+    ShapeNot_shapeExpr: async (
+      shapeExpr,
+      transformed,
+      parentStack
+    ): Promise<string> => {
+      return `ShapeNot_shapeExpr(${transformed})`;
+    },
+    NodeConstraint_values: async (
+      values,
+      transformed,
+      parentStack
+    ): Promise<string> => {
+      return `NodeConstraint_values(${transformed})`;
+    },
+    IriStemRange_exclusions: async (
+      exclusions,
+      transformed,
+      parentStack
+    ): Promise<string> => {
+      return `IriStemRange_exclusions(${transformed})`;
+    },
+    LiteralStemRange_exclusions: async (
+      exclusions,
+      transformed,
+      parentStack
+    ): Promise<string> => {
+      return `LiteralStemRange_exclusions(${transformed})`;
+    },
+    LanguageStemRange_exclusions: async (
+      exclusions,
+      transformed,
+      parentStack
+    ): Promise<string> => {
+      return `LanguageStemRange_exclusions(${transformed})`;
+    },
+    Shape_expression: async (
+      expression,
+      transformed,
+      parentStack
+    ): Promise<string> => {
+      return `Shape_expression(${transformed})`;
+    },
+    Shape_semActs: async (
+      semActs,
+      transformed,
+      parentStack
+    ): Promise<string> => {
+      return `Shape_semActs(${transformed})`;
+    },
+    Shape_Annotations: async (
+      annotations,
+      transformed,
+      parentStack
+    ): Promise<string> => {
+      return `Shape_Annotations(${transformed})`;
+    },
+    EachOf_expressions: async (
+      expressions,
+      transformed,
+      parentStack
+    ): Promise<string> => {
+      return `EachOf_expressions(${transformed})`;
+    },
+    EachOf_semActs: async (
+      semActs,
+      transformed,
+      parentStack
+    ): Promise<string> => {
+      return `EachOf_semActs(${transformed})`;
+    },
+    EachOf_Annotations: async (
+      annotations,
+      transformed,
+      parentStack
+    ): Promise<string> => {
+      return `EachOf_Annotations(${transformed})`;
+    },
+    OneOf_expressions: async (
+      expressions,
+      transformed,
+      parentStack
+    ): Promise<string> => {
+      return `OneOf_expressions(${transformed})`;
+    },
+    OneOf_semActs: async (
+      semActs,
+      transformed,
+      parentStack
+    ): Promise<string> => {
+      return `OneOf_semActs(${transformed})`;
+    },
+    OneOf_Annotations: async (
+      annotations,
+      transformed,
+      parentStack
+    ): Promise<string> => {
+      return `OneOf_Annotations(${transformed})`;
+    },
+    TripleConstraint_valueExpr: async (
+      valueExpr,
+      transformed,
+      parentStack
+    ): Promise<string> => {
+      return `TripleConstraint_valueExpr(${transformed})`;
+    },
+    TripleConstraint_semActs: async (
+      semActs,
+      transformed,
+      parentStack
+    ): Promise<string> => {
+      return `TripleConstraint_valueExpr(${transformed})`;
+    },
+    TripleConstraint_Annotations: async (
+      annotations,
+      transformed,
+      parentStack
+    ): Promise<string> => {
+      return `TripleConstraint_Annotations(${transformed})`;
+    },
   });
 }
+
+const animalIntf = dom.create.interface("Animal");
+const catIntf = dom.create.interface("Cat");
+catIntf.baseTypes = [ animalIntf ];
